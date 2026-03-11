@@ -1,10 +1,8 @@
-import { useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { Dumbbell } from 'lucide-react';
+import { useState } from "react";
+import { fetchAdminByPhone, saveAdminSession } from "../lib/admin";
 
-export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export default function Login({ onLogin }: { onLogin: () => void }) {
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,69 +10,164 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    setLoading(false);
+
+    try {
+      const adminSession = await fetchAdminByPhone(phone);
+
+      if (!adminSession) {
+        setError("No account found with this phone number.");
+        setLoading(false);
+        return;
+      }
+
+      saveAdminSession(adminSession);
+      onLogin();
+    } catch (err: any) {
+      setError(err.message || "An error occurred");
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-gray-800 p-8 rounded-xl shadow-2xl border border-gray-700">
-        <div>
-          <div className="flex justify-center">
-            <div className="p-3 bg-red-500 rounded-full">
-              <Dumbbell className="h-8 w-8 text-white" />
-            </div>
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
-            Admin Portal
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-400">
-            Sign in to manage Legend Gym
-          </p>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="email-address" className="sr-only">Email address</label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                required
-                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-600 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "var(--bg-primary)" }}
+    >
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(circle at top left, rgba(199, 90, 44, 0.15), transparent 28%), radial-gradient(circle at bottom right, rgba(223, 142, 77, 0.18), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0))",
+        }}
+      />
+
+      <div className="animate-fade-in-up max-w-md w-full mx-4">
+        <div
+          className="rounded-[32px] p-8 border shadow-[0_30px_90px_rgba(61,46,30,0.12)]"
+          style={{
+            background: "var(--bg-surface)",
+            borderColor: "var(--border-color)",
+          }}
+        >
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-20 h-20 rounded-[28px] overflow-hidden mb-4 animate-pulse-glow ring-1 ring-black/5">
+              <img
+                src="/logo.jpeg"
+                alt="Legend Fitness"
+                className="w-full h-full object-cover"
               />
             </div>
-            <div>
-              <label htmlFor="password" className="sr-only">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-600 bg-gray-700 placeholder-gray-400 text-white focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+            <p
+              className="text-[11px] uppercase tracking-[0.3em] mb-2"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              Legend Gym
+            </p>
+            <h1
+              className="text-3xl font-bold text-center"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Legend Fitness
+            </h1>
+            <p
+              className="text-sm mt-2 text-center max-w-xs"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Sign in with an admin phone number to manage members, attendance,
+              gym control, and broadcasts.
+            </p>
           </div>
 
-          {error && <div className="text-red-500 text-sm text-center">{error}</div>}
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label
+                className="block text-xs font-semibold tracking-wider mb-2 uppercase"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="9876543210"
+                className="w-full px-4 py-3 rounded-xl border text-sm font-medium outline-none transition-all duration-200 focus:ring-2 focus:ring-red-500/30"
+                style={{
+                  background: "var(--bg-secondary)",
+                  borderColor: error ? "var(--danger)" : "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
 
-          <div>
+            {error && (
+              <div
+                className="animate-fade-in flex items-center gap-2 text-sm px-3 py-2 rounded-lg"
+                style={{
+                  background: "rgba(239,68,68,0.1)",
+                  color: "var(--danger)",
+                }}
+              >
+                <svg
+                  className="w-4 h-4 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {error}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-gray-900 disabled:opacity-50 transition-colors"
+              className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all duration-200 disabled:opacity-50 cursor-pointer hover:brightness-110 active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(135deg, var(--accent), #df8e4d)",
+              }}
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="animate-spin w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                "Sign In"
+              )}
             </button>
-          </div>
-        </form>
+          </form>
+
+          <p
+            className="text-center text-xs mt-6"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            Admin access only
+          </p>
+        </div>
       </div>
     </div>
   );
