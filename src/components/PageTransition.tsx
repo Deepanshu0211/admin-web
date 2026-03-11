@@ -1,30 +1,25 @@
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 export default function PageTransition({ children }: { children: ReactNode }) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
-  const tl = useRef<gsap.core.Timeline | null>(null);
+  const timeline = useRef<gsap.core.Timeline | null>(null);
   const location = useLocation();
 
-  const generateLiquidPath = (x: number) => {
+  const generatePath = (x: number, direction: "enter" | "exit") => {
     const progress = x / 100;
+    const curve = 4 * progress * (1 - progress) * 60;
+    const cx = direction === "enter" ? x - curve : x + curve;
 
-    const wave = Math.sin(progress * Math.PI) * 30;
+    if (direction === "enter") {
+      return `M 100 0 L 100 100 L ${x} 100 Q ${cx} 50 ${x} 0 Z`;
+    }
 
-    const cp1x = x + wave;
-    const cp2x = x - wave;
-
-    return `
-      M 0 0
-      L 0 100
-      L ${x} 100
-      C ${cp1x} 80 ${cp2x} 20 ${x} 0
-      Z
-    `;
+    return `M 0 0 L 0 100 L ${x} 100 Q ${cx} 50 ${x} 0 Z`;
   };
 
   const showOverlay = () => {
@@ -41,65 +36,44 @@ export default function PageTransition({ children }: { children: ReactNode }) {
     overlayRef.current.style.pointerEvents = "none";
   };
 
-  const animate = (onComplete?: () => void) => {
+  const animate = (direction: "enter" | "exit", onComplete?: () => void) => {
+    if (!pathRef.current) return;
+
+    timeline.current?.kill();
+
     const state = { x: 0 };
 
-    tl.current?.kill();
-
-    tl.current = gsap.timeline({
-      defaults: { ease: "power4.inOut" },
+    timeline.current = gsap.timeline({
+      defaults: { ease: "power3.inOut" },
       onComplete,
     });
 
-    tl.current
-
-      // liquid sweep
-      .to(state, {
-        x: 100,
-        duration: 0.9,
-        onUpdate: () => {
-          if (!pathRef.current) return;
-          pathRef.current.setAttribute("d", generateLiquidPath(state.x));
-        },
-      })
-
-      // page reveal
-      .from(
-        "main",
-        {
-          opacity: 0,
-          scale: 0.96,
-          y: 40,
-          filter: "blur(12px)",
-          duration: 0.7,
-        },
-        0.2
-      );
+    timeline.current.to(state, {
+      x: 100,
+      duration: 0.6,
+      onUpdate: () => {
+        pathRef.current!.setAttribute("d", generatePath(state.x, direction));
+      },
+    });
   };
 
   useEffect(() => {
     const handler = (e: any) => {
       const callback = e.detail?.callback;
-
       if (!callback) return;
 
       showOverlay();
-
-      animate(() => {
-        callback();
-      });
+      animate("exit", callback);
     };
 
     window.addEventListener("start-page-transition", handler);
-
-    return () =>
-      window.removeEventListener("start-page-transition", handler);
+    return () => window.removeEventListener("start-page-transition", handler);
   }, []);
 
   useGSAP(() => {
     showOverlay();
 
-    animate(() => {
+    animate("enter", () => {
       hideOverlay();
     });
   }, [location.pathname]);
@@ -108,32 +82,22 @@ export default function PageTransition({ children }: { children: ReactNode }) {
     <>
       <div
         ref={overlayRef}
-        className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none backdrop-blur-md"
+        className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none will-change-transform"
       >
         <svg
           className="absolute inset-0 w-full h-full"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
         >
-          <defs>
-            <linearGradient id="liquidGradient" gradientTransform="rotate(45)">
-              <stop offset="0%" stopColor="#7c3aed" />
-              <stop offset="50%" stopColor="#6366f1" />
-              <stop offset="100%" stopColor="#22d3ee" />
-            </linearGradient>
-          </defs>
-
           <path
             ref={pathRef}
-            fill="url(#liquidGradient)"
-            d="M 0 0 L 0 100 L 0 100 C 0 75 0 25 0 0 Z"
+            fill="var(--accent)"
+            d="M 100 0 L 100 100 L 0 100 Q 0 50 0 0 Z"
           />
         </svg>
       </div>
 
-      <main className="will-change-transform">
-        {children}
-      </main>
+      {children}
     </>
   );
 }
